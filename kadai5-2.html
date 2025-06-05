@@ -1,20 +1,57 @@
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="utf-8">
     <title>演習課題5-2：外部APIの呼び出しテスト</title>
 </head>
 <body>
-    <h1 id="msg">何かのAPI</h1>
-    <form name="apiform"><p>
-        何かのフォーム：<input type="text" name="form_data">
-        <button type="button" id="btn1" onclick="some_api(this.form)">実行</button>
-    </p></form>
+    <h1 id="msg">天気予報を取得するAPI</h1>
+    <form name="apiform">
+        <p>
+            都市名を入力してください：
+            <input type="text" name="form_data" required>
+            <button type="button" id="btn1" onclick="some_api(this.form)">実行</button>
+        </p>
+    </form>
     
     <div id="result"></div>
+
     <script>
         async function some_api(myForm) {
-            // ここにコードを書く
-            document.getElementById("result").innerHTML += myForm.form_data.value+"<br />";
+            const city = myForm.form_data.value.trim();
+            const resultDiv = document.getElementById("result");
+
+            if (!city) {
+                resultDiv.innerHTML += "都市名を入力してください。<br />";
+                return;
+            }
+
+            try {
+                // ① 都市名から緯度・経度を取得
+                const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+                const geoData = await geoRes.json();
+
+                if (!geoData.results || geoData.results.length === 0) {
+                    resultDiv.innerHTML += `「${city}」の場所が見つかりませんでした。<br />`;
+                    return;
+                }
+
+                const { latitude, longitude, name, country } = geoData.results[0];
+
+                // ② 天気予報を取得（今日の最高・最低気温）
+                const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,temperature_2m_min&timezone=auto`);
+                const weatherData = await weatherRes.json();
+
+                const todayMax = weatherData.daily.temperature_2m_max[0];
+                const todayMin = weatherData.daily.temperature_2m_min[0];
+
+                resultDiv.innerHTML += `${name}（${country}）の今日の天気：<br />
+                    最低気温 ${todayMin}℃ / 最高気温 ${todayMax}℃<br /><br />`;
+            } catch (error) {
+                resultDiv.innerHTML += "天気情報の取得に失敗しました。<br />";
+                console.error(error);
+            }
+
             document.apiform.reset();
         }
     </script>
